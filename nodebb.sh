@@ -13,7 +13,7 @@ ask_user() {
   while true; do
 
     echo -e "$3"
-    read -r -p "请输入 $1" USER_INPUT
+    read -r -p "请输入 $1 :" USER_INPUT
     echo "$1" | tr "/" "\n" | grep -Eiq "^${USER_INPUT}$" && eval "$2=\"$USER_INPUT\"" && break
   done
 }
@@ -29,11 +29,12 @@ if [[ $(command -v apt-get) || $(command -v yum) ]] && [[ $(command -v systemctl
 else
 
   echo -e " 
-	哈哈……这个 ${red}辣鸡脚本${none} 不支持你的系统。 ${yellow}(-_-) ${none}
-	备注: 仅支持 Ubuntu 16+ / Debian 8+ / CentOS 7+ 系统
+	这个 ${red}辣鸡脚本${none} 不支持你的系统。 ${yellow}(-_-) ${none}
+	备注: 仅测试过 Ubuntu 18  / CentOS 7 系统
 	" && exit 1
 
 fi
+
 install() {
 
   # 低级的检测方法
@@ -56,6 +57,15 @@ install() {
     $cmd -y groupinstall "Development Tools"
     $cmd -y install git ImageMagick ImageMagick-devel
   fi
+
+  install_node
+  install_mongodb
+  install_nodebb
+
+}
+
+install_node() {
+
   curl -sL https://rpm.nodesource.com/setup_12.x | bash -
   changeNodeRepo
   # 这真的有必要吗
@@ -67,14 +77,12 @@ install() {
     return
   fi
 
-  install_mongodb
-
 }
 
 changeNodeRepo() {
 
   ask_user "y/n" "nodeRepo" "是否要修改Nodejs的镜像源(国内服务器推荐)"
-  [ "$YES_OR_NO" = "y" ] && {
+  [ "$nodeRepo" = "y" ] && {
 
     if [ $cmd == 'yum' ]; then
 
@@ -98,7 +106,7 @@ gpgkey = https://www.mongodb.org/static/pgp/server-4.2.asc" >/etc/yum.repos.d/mo
 
   $cmd update
   $cmd -y install mongodb-org
-  if [[ $(command -v mongo) ]]; then
+  if [[ ! $(command -v mongo) ]]; then
     echo "检测到Mongodb安装失败了"
     return
   fi
@@ -111,8 +119,7 @@ gpgkey = https://www.mongodb.org/static/pgp/server-4.2.asc" >/etc/yum.repos.d/mo
 }
 
 configure_mongodb() {
-
-$cmd install expect -y
+  $cmd install expect -y
   read -r -p "$(echo -e "请输入 [${magenta}Mongodb的数据库名(nodebb)$none]:")" db
   if [ -z "${db}" ]; then
     db="nodebb"
@@ -121,23 +128,56 @@ $cmd install expect -y
   if [ -z "${dbname}" ]; then
     dbname="nodebb"
   fi
-  read -r -p "$(echo -e "请输入 [${magenta}Mongodb的密码(自己想)$none]:")" dbpass
-  spawn mongo
-  expect ">"
-  send "use $db"
-  expect ">"
-  send "db.createUser( { user: $name, pwd: $pass, roles: [ \"readWrite\" ] } )"
-  expect ">"
-  send "db.grantRolesToUser($name,[{ role: \"clusterMonitor\", db: \"admin\" }]);"
-  send "exit\r"
-  expect eof
+  read -r -p "$(echo -e "请输入 [${magenta}Mongodb的密码(必须输入)$none]:")" dbpass
 
+  # 待修改为随机
+  if [ -z "${dbpass}" ]; then
+    dbname="123456789"
+  fi
+
+  # 这转意可以上天了
+  expect -c "
+  spawn mongo
+   expect \">\"
+  send \"use $db \r \"
+  expect \">\"
+  send \"db.createUser\( \{ user: \\\"$dbname\\\", pwd: \\\"$dbpass\\\", roles: \[ \\\"readWrite\\\" \] \} \) \r \"
+  expect \">\"
+  send \"exit\r\"
+  expect eof
+  "
+  echo "security:
+   authorization: enabled" >>/etc/mongod.conf
+  service mongod restart
+  #send \"db.grantRolesToUser($dbname,[{ role: \"clusterMonitor\", db: \"admin\" }]); \r \"
 }
 
 install_nodebb() {
 
   cd /home || exit
   git clone -b v1.13.x https://github.com/NodeBB/NodeBB.git nodebb
+  if [ ! -d "./nodebb" ]; then
+    echo "nodebb可能克隆失败,请对照文档手动安装nodebb"
+    return
+
+    echo "nodebb克隆成功,下面按照文档安装NodeBB就可以了，数据库名和用户密码就是刚刚提示让你输入的"
+    configure_nodebb
+
+    #ask_user "y/n" "nodebbBoolean" "是否要自动配置NodeBB(推荐,不过网络不好有可能失败)"
+
+    #[ "$nodebbBoolean" = "y" ] && {
+
+    #configure_nodebb
+    #}
+
+  fi
+
+}
+
+configure_nodebb() {
+
+  cd /home/nodebb || exit
+  ./nodebb setup
 }
 
 error() {
@@ -148,15 +188,16 @@ error() {
 
 while :; do
   echo
-  echo "........... NodeBB 一键安装脚本 & 管理脚本 meitianxue.net 每天学 制作 .........."
+  echo "........... NodeBB 一键安装脚本 meitianxue.net 每天学 制作 .........."
   echo
   echo "这个脚本结合了各位大佬的思路"
   echo "脚本发布地址: https://meitianxue.net"
   echo "有问题请在脚本发布页面留言,我会解决的"
   echo "暂时只支持(测试过)Centos7系统"
+  echo "安装过程中可能会出现不可预料的错误?"
   echo
   echo "参考 https://www.yuque.com/a632079/nodebb/installation-os-centos"
-  echo "特别感谢 gaein 233boy"
+  echo "特别感谢 gaein 233boy NodeBB中文社区 NodeBB"
   echo
   echo " 1. 安装"
   echo
