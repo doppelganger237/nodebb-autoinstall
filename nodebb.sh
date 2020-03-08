@@ -178,6 +178,8 @@ configure_mongodb() {
 install_nodebb() {
 
   cd /home || exit
+  #检查git
+  $cmd install git -y
   git clone -b v1.13.x https://github.com/NodeBB/NodeBB.git nodebb
   if [ ! -d "./nodebb" ]; then
     echo "nodebb可能克隆失败,请对照文档手动安装nodebb"
