@@ -58,6 +58,11 @@ install() {
     $cmd -y install git ImageMagick ImageMagick-devel
   fi
 
+  #不要怕笨，争取做成屎山
+  if [ $cmd == 'apt-get' ]; then
+    $cmd -y install curl
+  fi
+
   install_node
   install_mongodb
   install_nodebb
@@ -66,7 +71,15 @@ install() {
 
 install_node() {
 
-  curl -sL https://rpm.nodesource.com/setup_12.x | bash -
+  if [ $cmd == 'yum' ]; then
+    curl -sL https://rpm.nodesource.com/setup_12.x | bash -
+  fi
+
+  #不要怕笨，争取做成屎山
+  if [ $cmd == 'apt-get' ]; then
+    curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+  fi
+
   changeNodeRepo
   # 这真的有必要吗
   $cmd update -y
@@ -96,13 +109,23 @@ changeNodeRepo() {
 }
 
 install_mongodb() {
-  # 这个源也太慢了把兄弟
-  echo "[mongodb-org-4.2] 
+
+  if [ $cmd == 'yum' ]; then
+    # 这个源也太慢了把兄弟
+    echo "[mongodb-org-4.2] 
 name = MongoDB Repository 
 baseurl = https://repo.mongodb.org/yum/redhat/\$releasever/mongodb-org/4.2/x86_64/ 
 gpgcheck = 1 
 enabled = 1 
 gpgkey = https://www.mongodb.org/static/pgp/server-4.2.asc" >/etc/yum.repos.d/mongodb-org-4.2.repo
+  fi
+
+  #不要怕笨，争取做成屎山
+  if [ $cmd == 'apt-get' ]; then
+    sudo apt-get install gnupg
+    wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add
+    sudo echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.2.list
+  fi
 
   $cmd update
   $cmd -y install mongodb-org
