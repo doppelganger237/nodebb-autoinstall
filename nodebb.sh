@@ -158,7 +158,7 @@ configure_mongodb() {
     dbname="123456789"
   fi
 
-  # 这转意可以上天了
+  # 这转义可以上天了
   expect -c "
   spawn mongo
    expect \">\"
